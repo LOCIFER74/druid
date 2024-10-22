@@ -31,8 +31,6 @@ import type { Capabilities } from '../../helpers';
 import { Api } from '../../singletons';
 import {
   ceilToUtcDay,
-  formatBytes,
-  formatInteger,
   isNonNullRange,
   localToUtcDateRange,
   queryDruidSql,
@@ -42,7 +40,7 @@ import {
 } from '../../utils';
 import { Loader } from '../loader/loader';
 
-import type { BarUnitData } from './stacked-bar-chart';
+import type { BarUnitData, SegmentStat } from './common';
 import { StackedBarChart } from './stacked-bar-chart';
 
 import './segment-timeline.scss';
@@ -51,8 +49,6 @@ interface SegmentTimelineProps {
   capabilities: Capabilities;
 }
 
-type ActiveDataType = 'sizeData' | 'countData';
-
 interface SegmentTimelineState {
   chartHeight: number;
   chartWidth: number;
@@ -60,8 +56,8 @@ interface SegmentTimelineState {
   datasources: string[];
   stackedData?: Record<string, BarUnitData[]>;
   singleDatasourceData?: Record<string, Record<string, BarUnitData[]>>;
-  activeDatasource: string | null;
-  activeDataType: ActiveDataType;
+  activeDatasource?: string;
+  activeSegmentStat: SegmentStat;
   dataToRender: BarUnitData[];
   loading: boolean;
   error?: Error;
@@ -246,7 +242,7 @@ ORDER BY "start" DESC`;
     any
   >;
 
-  private readonly chartMargin = { top: 40, right: 15, bottom: 20, left: 60 };
+  private readonly chartMargin = { top: 40, right: 0, bottom: 20, left: 60 };
 
   constructor(props: SegmentTimelineProps) {
     super(props);
@@ -260,8 +256,7 @@ ORDER BY "start" DESC`;
       stackedData: {},
       singleDatasourceData: {},
       dataToRender: [],
-      activeDatasource: null,
-      activeDataType: 'sizeData',
+      activeSegmentStat: 'sizeData',
       loading: true,
       xScale: null,
       yScale: null,
@@ -355,10 +350,10 @@ ORDER BY "start" DESC`;
   }
 
   componentDidUpdate(_prevProps: SegmentTimelineProps, prevState: SegmentTimelineState): void {
-    const { activeDatasource, activeDataType, singleDatasourceData, stackedData } = this.state;
+    const { activeDatasource, activeSegmentStat, singleDatasourceData, stackedData } = this.state;
     if (
       prevState.data !== this.state.data ||
-      prevState.activeDataType !== this.state.activeDataType ||
+      prevState.activeSegmentStat !== this.state.activeSegmentStat ||
       prevState.activeDatasource !== this.state.activeDatasource ||
       prevState.chartWidth !== this.state.chartWidth ||
       prevState.chartHeight !== this.state.chartHeight
@@ -366,10 +361,10 @@ ORDER BY "start" DESC`;
       const scales: BarChartScales | undefined = this.calculateScales();
       const dataToRender: BarUnitData[] | undefined = activeDatasource
         ? singleDatasourceData
-          ? singleDatasourceData[activeDataType][activeDatasource]
+          ? singleDatasourceData[activeSegmentStat][activeDatasource]
           : undefined
         : stackedData
-        ? stackedData[activeDataType]
+        ? stackedData[activeSegmentStat]
         : undefined;
 
       if (scales && dataToRender) {
@@ -387,31 +382,26 @@ ORDER BY "start" DESC`;
       chartWidth,
       chartHeight,
       data,
-      activeDataType,
+      activeSegmentStat,
       activeDatasource,
       singleDatasourceData,
       dateRange,
     } = this.state;
     if (!data || !Object.keys(data).length || !isNonNullRange(dateRange)) return;
-    const activeData = data[activeDataType];
+    const activeData = data[activeSegmentStat];
 
-    let yDomain: number[] = [
-      0,
+    let yMax =
       activeData.length === 0
-        ? 0
-        : activeData.reduce((max: any, d: any) => (max.total > d.total ? max : d)).total,
-    ];
+        ? 100
+        : activeData.reduce((max: any, d: any) => (max.total > d.total ? max : d)).total;
 
     if (
-      activeDatasource !== null &&
-      singleDatasourceData![activeDataType][activeDatasource] !== undefined
+      activeDatasource &&
+      singleDatasourceData![activeSegmentStat][activeDatasource] !== undefined
     ) {
-      yDomain = [
-        0,
-        singleDatasourceData![activeDataType][activeDatasource].reduce((max: any, d: any) =>
-          max.y > d.y ? max : d,
-        ).y,
-      ];
+      yMax = singleDatasourceData![activeSegmentStat][activeDatasource].reduce((max: any, d: any) =>
+        max.y > d.y ? max : d,
+      ).y;
     }
 
     const xScale: AxisScale<Date> = scaleUtc()
@@ -420,23 +410,13 @@ ORDER BY "start" DESC`;
 
     const yScale: AxisScale<number> = scaleLinear()
       .rangeRound([chartHeight - this.chartMargin.top - this.chartMargin.bottom, 0])
-      .domain(yDomain);
+      .domain([0, yMax]);
 
     return {
       xScale,
       yScale,
     };
   }
-
-  private readonly formatTick = (n: number) => {
-    if (isNaN(n)) return '';
-    const { activeDataType } = this.state;
-    if (activeDataType === 'countData') {
-      return formatInteger(n);
-    } else {
-      return formatBytes(n);
-    }
-  };
 
   private readonly handleResize = (entries: ResizeObserverEntry[]) => {
     const chartRect = entries[0].contentRect;
@@ -452,7 +432,7 @@ ORDER BY "start" DESC`;
       chartHeight,
       loading,
       dataToRender,
-      activeDataType,
+      activeSegmentStat,
       error,
       xScale,
       yScale,
@@ -485,7 +465,7 @@ ORDER BY "start" DESC`;
       );
     }
 
-    if (data![activeDataType].length === 0) {
+    if (data![activeSegmentStat].length === 0) {
       return (
         <div>
           <span className="no-data-text">There are no segments for the selected interval</span>
@@ -494,8 +474,8 @@ ORDER BY "start" DESC`;
     }
 
     if (
-      activeDatasource !== null &&
-      data![activeDataType].every((d: any) => d[activeDatasource] === undefined)
+      activeDatasource &&
+      data![activeSegmentStat].every((d: any) => d[activeDatasource] === undefined)
     ) {
       return (
         <div>
@@ -519,13 +499,12 @@ ORDER BY "start" DESC`;
           svgHeight={chartHeight}
           svgWidth={chartWidth}
           margin={this.chartMargin}
-          changeActiveDatasource={(datasource: string | null) =>
+          changeActiveDatasource={(datasource: string | undefined) =>
             this.setState(prevState => ({
-              activeDatasource: prevState.activeDatasource ? null : datasource,
+              activeDatasource: prevState.activeDatasource ? undefined : datasource,
             }))
           }
-          activeDataType={activeDataType}
-          formatTick={(n: number) => this.formatTick(n)}
+          shownSegmentStat={activeSegmentStat}
           xScale={xScale}
           yScale={yScale}
           barWidth={barWidth}
@@ -536,7 +515,7 @@ ORDER BY "start" DESC`;
 
   render() {
     const { capabilities } = this.props;
-    const { datasources, activeDataType, activeDatasource, dateRange, selectedDateRange } =
+    const { datasources, activeSegmentStat, activeDatasource, dateRange, selectedDateRange } =
       this.state;
 
     const filterDatasource: ItemPredicate<string> = (query, val, _index, exactMatch) => {
@@ -574,7 +553,7 @@ ORDER BY "start" DESC`;
       const showAll = 'Show all';
       const handleItemSelected = (selectedItem: string) => {
         this.setState({
-          activeDatasource: selectedItem === showAll ? null : selectedItem,
+          activeDatasource: selectedItem === showAll ? undefined : selectedItem,
         });
       };
       const datasourcesWzAll = [showAll].concat(datasources);
@@ -602,9 +581,9 @@ ORDER BY "start" DESC`;
         <div className="side-control">
           <FormGroup label="Show">
             <SegmentedControl
-              value={activeDataType}
+              value={activeSegmentStat}
               onValueChange={activeDataType =>
-                this.setState({ activeDataType: activeDataType as ActiveDataType })
+                this.setState({ activeSegmentStat: activeDataType as SegmentStat })
               }
               options={[
                 {

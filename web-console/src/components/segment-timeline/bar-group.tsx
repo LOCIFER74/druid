@@ -19,26 +19,18 @@
 import type { AxisScale } from 'd3-axis';
 import React from 'react';
 
-import { BarUnit } from './bar-unit';
-import type { BarUnitData, HoveredBarInfo } from './stacked-bar-chart';
+import type { BarUnitData, HoveredBarInfo } from './common';
 
 interface BarGroupProps {
   dataToRender: BarUnitData[];
   changeActiveDatasource: (dataSource: string) => void;
-  formatTick: (e: number) => string;
   xScale: AxisScale<Date>;
   yScale: AxisScale<number>;
   barWidth: number;
-  onHoverBar?: (e: any) => void;
-  offHoverBar?: () => void;
-  hoverOn?: HoveredBarInfo | null;
+  onHoverBar: (e: HoveredBarInfo) => void;
 }
 
 export class BarGroup extends React.Component<BarGroupProps> {
-  shouldComponentUpdate(nextProps: BarGroupProps): boolean {
-    return nextProps.hoverOn === this.props.hoverOn;
-  }
-
   render() {
     const { dataToRender, changeActiveDatasource, xScale, yScale, onHoverBar, barWidth } =
       this.props;
@@ -47,6 +39,8 @@ export class BarGroup extends React.Component<BarGroupProps> {
     return dataToRender.map((entry: BarUnitData, i: number) => {
       const y0 = yScale(entry.y0 || 0) || 0;
       const x = xScale(new Date(entry.x + 'T00:00:00Z'));
+      if (typeof x === 'undefined') return;
+
       const y = yScale((entry.y0 || 0) + entry.y) || 0;
       const height = Math.max(y0 - y, 0);
       const barInfo: HoveredBarInfo = {
@@ -59,15 +53,16 @@ export class BarGroup extends React.Component<BarGroupProps> {
         dailySize: entry.dailySize,
       };
       return (
-        <BarUnit
+        <rect
           key={i}
+          className="bar-unit"
           x={x}
           y={y}
           width={barWidth}
           height={height}
           style={{ fill: entry.color }}
           onClick={() => changeActiveDatasource(entry.datasource)}
-          onHover={() => onHoverBar && onHoverBar(barInfo)}
+          onMouseOver={() => onHoverBar(barInfo)}
         />
       );
     });

@@ -418,7 +418,7 @@ GROUP BY 1, 2`;
         LocalStorageKeys.DATASOURCE_TABLE_COLUMN_SELECTION,
         ['Segment size', 'Segment granularity'],
       ),
-      showSegmentTimeline: false,
+      showSegmentTimeline: true,
 
       actions: [],
     };

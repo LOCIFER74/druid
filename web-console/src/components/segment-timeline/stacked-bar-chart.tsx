@@ -20,47 +20,21 @@ import type { AxisScale } from 'd3-axis';
 import { axisBottom, axisLeft } from 'd3-axis';
 import React, { useState } from 'react';
 
+import { formatBytes, formatInteger } from '../../utils';
+
 import { BarGroup } from './bar-group';
 import { ChartAxis } from './chart-axis';
+import type { BarUnitData, HoveredBarInfo, Margin, SegmentStat } from './common';
 
 import './stacked-bar-chart.scss';
-
-export interface BarUnitData {
-  x: number;
-  y: number;
-  y0?: number;
-  width: number;
-  datasource: string;
-  color: string;
-  dailySize?: number;
-}
-
-export interface BarChartMargin {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-}
-
-export interface HoveredBarInfo {
-  xCoordinate?: number;
-  yCoordinate?: number;
-  height?: number;
-  width?: number;
-  datasource?: string;
-  xValue?: number;
-  yValue?: number;
-  dailySize?: number;
-}
 
 interface StackedBarChartProps {
   svgWidth: number;
   svgHeight: number;
-  margin: BarChartMargin;
-  activeDataType?: string;
+  margin: Margin;
+  shownSegmentStat: SegmentStat;
   dataToRender: BarUnitData[];
-  changeActiveDatasource: (e: string | null) => void;
-  formatTick: (e: number) => string;
+  changeActiveDatasource: (e: string | undefined) => void;
   xScale: AxisScale<Date>;
   yScale: AxisScale<number>;
   barWidth: number;
@@ -71,11 +45,10 @@ export const StackedBarChart = React.forwardRef(function StackedBarChart(
   ref,
 ) {
   const {
-    activeDataType,
+    shownSegmentStat,
     svgWidth,
     svgHeight,
     margin,
-    formatTick,
     xScale,
     yScale,
     dataToRender,
@@ -84,11 +57,36 @@ export const StackedBarChart = React.forwardRef(function StackedBarChart(
   } = props;
   const [hoverOn, setHoverOn] = useState<HoveredBarInfo>();
 
+  const formatTick = (n: number) => {
+    if (isNaN(n)) return '';
+    if (shownSegmentStat === 'countData') {
+      return formatInteger(n);
+    } else {
+      return formatBytes(n);
+    }
+  };
+
   const width = svgWidth - margin.left - margin.right;
   const height = svgHeight - margin.top - margin.bottom;
 
-  function renderBarChart() {
-    return (
+  return (
+    <div className="stacked-bar-chart" ref={ref as any}>
+      {hoverOn && (
+        <div className="bar-chart-tooltip">
+          <div>Datasource: {hoverOn.datasource}</div>
+          <div>Time: {hoverOn.xValue}</div>
+          <div>
+            {`${
+              shownSegmentStat === 'countData' ? 'Daily total count:' : 'Daily total size:'
+            } ${formatTick(hoverOn.dailySize)}`}
+          </div>
+          <div>
+            {`${shownSegmentStat === 'countData' ? 'Count:' : 'Size:'} ${formatTick(
+              hoverOn.yValue,
+            )}`}
+          </div>
+        </div>
+      )}
       <svg
         width={svgWidth}
         height={svgHeight}
@@ -102,7 +100,7 @@ export const StackedBarChart = React.forwardRef(function StackedBarChart(
           <ChartAxis
             className="gridline-x"
             transform="translate(0, 0)"
-            scale={axisLeft(yScale)
+            axis={axisLeft(yScale)
               .ticks(5)
               .tickSize(-width)
               .tickFormat(() => '')
@@ -111,30 +109,28 @@ export const StackedBarChart = React.forwardRef(function StackedBarChart(
           <BarGroup
             dataToRender={dataToRender}
             changeActiveDatasource={changeActiveDatasource}
-            formatTick={formatTick}
             xScale={xScale}
             yScale={yScale}
             onHoverBar={(e: HoveredBarInfo) => setHoverOn(e)}
-            hoverOn={hoverOn}
             barWidth={barWidth}
           />
           <ChartAxis
             className="axis-x"
             transform={`translate(0, ${height})`}
-            scale={axisBottom(xScale)}
+            axis={axisBottom(xScale)}
           />
           <ChartAxis
             className="axis-y"
-            scale={axisLeft(yScale)
+            axis={axisLeft(yScale)
               .ticks(5)
-              .tickFormat((e: number) => formatTick(e))}
+              .tickFormat(e => formatTick(e))}
           />
           {hoverOn && (
             <g
               className="hovered-bar"
               onClick={() => {
                 setHoverOn(undefined);
-                changeActiveDatasource(hoverOn.datasource ?? null);
+                changeActiveDatasource(hoverOn.datasource);
               }}
             >
               <rect
@@ -147,28 +143,6 @@ export const StackedBarChart = React.forwardRef(function StackedBarChart(
           )}
         </g>
       </svg>
-    );
-  }
-
-  return (
-    <div className="stacked-bar-chart" ref={ref as any}>
-      {hoverOn && (
-        <div className="bar-chart-tooltip">
-          <div>Datasource: {hoverOn.datasource}</div>
-          <div>Time: {hoverOn.xValue}</div>
-          <div>
-            {`${
-              activeDataType === 'countData' ? 'Daily total count:' : 'Daily total size:'
-            } ${formatTick(hoverOn.dailySize!)}`}
-          </div>
-          <div>
-            {`${activeDataType === 'countData' ? 'Count:' : 'Size:'} ${formatTick(
-              hoverOn.yValue!,
-            )}`}
-          </div>
-        </div>
-      )}
-      {renderBarChart()}
     </div>
   );
 });

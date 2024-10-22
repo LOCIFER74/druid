@@ -16,30 +16,31 @@
  * limitations under the License.
  */
 
-interface BarChartUnitProps {
-  x: number | undefined;
+export interface BarUnitData {
+  x: number;
   y: number;
+  y0?: number;
   width: number;
-  height: number;
-  style?: any;
-  onClick?: () => void;
-  onHover?: () => void;
-  offHover?: () => void;
+  datasource: string;
+  color: string;
+  dailySize: number;
 }
 
-export function BarUnit(props: BarChartUnitProps) {
-  const { x, y, width, height, style, onClick, onHover, offHover } = props;
-  return (
-    <rect
-      className="bar-unit"
-      x={x}
-      y={y}
-      width={width}
-      height={height}
-      style={style}
-      onClick={onClick}
-      onMouseOver={onHover}
-      onMouseLeave={offHover}
-    />
-  );
+export interface Margin {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
 }
+
+export interface HoveredBarInfo {
+  xCoordinate: number;
+  yCoordinate: number;
+  height: number;
+  datasource: string;
+  xValue: number;
+  yValue: number;
+  dailySize: number;
+}
+
+export type SegmentStat = 'sizeData' | 'countData';
