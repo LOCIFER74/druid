@@ -28,6 +28,7 @@
 
   .side-control {
     @include card-like;
+    height: 100%;
     padding: 10px;
   }
 

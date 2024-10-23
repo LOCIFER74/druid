@@ -564,7 +564,7 @@ ORDER BY "start" DESC`;
           items={datasourcesWzAll}
           onItemSelect={handleItemSelected}
           itemRenderer={datasourceRenderer}
-          noResults={<MenuItem disabled text="No results." roleStructure="listoption" />}
+          noResults={<MenuItem disabled text="No results" roleStructure="listoption" />}
           itemPredicate={filterDatasource}
           fill
         >
