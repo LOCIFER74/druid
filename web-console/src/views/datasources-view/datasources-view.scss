@@ -23,7 +23,7 @@
   width: 100%;
   overflow: auto;
 
-  .splitter-layout {
+  .splitter-layout.timeline-datasources-splitter {
     position: absolute;
     top: $view-control-bar-height + $standard-padding;
     bottom: 0;

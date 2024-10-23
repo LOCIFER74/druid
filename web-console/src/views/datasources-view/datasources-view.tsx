@@ -1714,6 +1714,7 @@ GROUP BY 1, 2`;
           />
         </ViewControlBar>
         <SplitterLayout
+          className="timeline-datasources-splitter"
           vertical
           percentage
           secondaryInitialSize={35}

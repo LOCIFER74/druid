@@ -16,7 +16,14 @@
  * limitations under the License.
  */
 
-import { Button, FormGroup, MenuItem, ResizeSensor, SegmentedControl } from '@blueprintjs/core';
+import {
+  Button,
+  FormGroup,
+  MenuItem,
+  ResizeSensor,
+  SegmentedControl,
+  Tag,
+} from '@blueprintjs/core';
 import type { DateRange, NonNullDateRange } from '@blueprintjs/datetime';
 import { DateRangeInput3 } from '@blueprintjs/datetime2';
 import { IconNames } from '@blueprintjs/icons';
@@ -39,6 +46,7 @@ import {
   utcToLocalDateRange,
 } from '../../utils';
 import { Loader } from '../loader/loader';
+import { SplitterLayout } from '../splitter-layout/splitter-layout';
 
 import type { BarUnitData, SegmentStat } from './common';
 import { StackedBarChart } from './stacked-bar-chart';
@@ -442,16 +450,12 @@ ORDER BY "start" DESC`;
     } = this.state;
 
     if (loading) {
-      return (
-        <div>
-          <Loader loading={loading} />
-        </div>
-      );
+      return <Loader />;
     }
 
     if (error) {
       return (
-        <div>
+        <div className="empty-placeholder">
           <span className="no-data-text">Error when loading data: {error.message}</span>
         </div>
       );
@@ -459,7 +463,7 @@ ORDER BY "start" DESC`;
 
     if (xScale === null || yScale === null) {
       return (
-        <div>
+        <div className="empty-placeholder">
           <span className="no-data-text">Error when calculating scales</span>
         </div>
       );
@@ -467,7 +471,7 @@ ORDER BY "start" DESC`;
 
     if (data![activeSegmentStat].length === 0) {
       return (
-        <div>
+        <div className="empty-placeholder">
           <span className="no-data-text">There are no segments for the selected interval</span>
         </div>
       );
@@ -478,9 +482,9 @@ ORDER BY "start" DESC`;
       data![activeSegmentStat].every((d: any) => d[activeDatasource] === undefined)
     ) {
       return (
-        <div>
+        <div className="empty-placeholder">
           <span className="no-data-text">
-            No data available for <i>{activeDatasource}</i>
+            No data available for <Tag minimal>{activeDatasource}</Tag>
           </span>
         </div>
       );
@@ -525,7 +529,7 @@ ORDER BY "start" DESC`;
       if (exactMatch) {
         return normalizedTitle === normalizedQuery;
       } else {
-        return ` ${normalizedTitle}`.includes(normalizedQuery);
+        return normalizedTitle.includes(normalizedQuery);
       }
     };
 
@@ -533,9 +537,7 @@ ORDER BY "start" DESC`;
       val,
       { handleClick, handleFocus, modifiers },
     ) => {
-      if (!modifiers.matchesPredicate) {
-        return null;
-      }
+      if (!modifiers.matchesPredicate) return null;
       return (
         <MenuItem
           key={val}
@@ -576,7 +578,12 @@ ORDER BY "start" DESC`;
     };
 
     return (
-      <div className="segment-timeline">
+      <SplitterLayout
+        className="segment-timeline"
+        primaryMinSize={400}
+        secondaryInitialSize={220}
+        secondaryMaxSize={400}
+      >
         {this.renderStackedBarChart()}
         <div className="side-control">
           <FormGroup label="Show">
@@ -616,7 +623,7 @@ ORDER BY "start" DESC`;
             <DatasourceSelect />
           </FormGroup>
         </div>
-      </div>
+      </SplitterLayout>
     );
   }
 }

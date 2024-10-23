@@ -19,14 +19,6 @@
 @import '../../variables';
 
 .segment-timeline {
-  display: grid;
-  grid-template-columns: 1fr 240px;
-  gap: 8px;
-
-  .loader {
-    width: 85%;
-  }
-
   .loading-error {
     position: fixed;
     top: 50%;
@@ -34,15 +26,23 @@
     transform: translate(-50%, -50%);
   }
 
-  .no-data-text {
-    position: absolute;
-    left: 30vw;
-    top: 15vh;
-    font-size: 20px;
-  }
-
   .side-control {
     @include card-like;
     padding: 10px;
+  }
+
+  .stacked-bar-chart {
+    height: 100%;
+  }
+
+  .empty-placeholder {
+    height: 100%;
+
+    .no-data-text {
+      position: absolute;
+      left: 30vw;
+      top: 15vh;
+      font-size: 20px;
+    }
   }
 }

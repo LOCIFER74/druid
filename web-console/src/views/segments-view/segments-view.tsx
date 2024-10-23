@@ -1021,6 +1021,7 @@ END AS "time_span"`,
           />
         </ViewControlBar>
         <SplitterLayout
+          className="timeline-segments-splitter"
           vertical
           percentage
           secondaryInitialSize={35}
