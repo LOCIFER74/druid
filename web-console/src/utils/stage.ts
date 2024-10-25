@@ -16,19 +16,30 @@
  * limitations under the License.
  */
 
-export type SegmentStat = 'count' | 'size' | 'rows';
-
-export interface SegmentRow extends Record<SegmentStat, number> {
-  start: string;
-  end: string;
-  datasource?: string;
+export interface Margin {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
 }
 
-export interface SegmentBar extends SegmentRow {
-  startDate: Date;
-  endDate: Date;
-}
+export class Stage {
+  public readonly width: number;
+  public readonly height: number;
 
-export interface StackedSegmentBar extends SegmentBar {
-  offset: Record<SegmentStat, number>;
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+  }
+
+  public equals(other: Stage | undefined): boolean {
+    return Boolean(other && this.width === other.width && this.height === other.height);
+  }
+
+  public applyMargin(margin: Margin): Stage {
+    return new Stage(
+      this.width - margin.left - margin.right,
+      this.height - margin.top - margin.bottom,
+    );
+  }
 }

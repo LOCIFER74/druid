@@ -16,16 +16,39 @@
  * limitations under the License.
  */
 
-export class Stage {
-  public readonly width: number;
-  public readonly height: number;
+.segment-bar-chart-render {
+  position: relative;
+  overflow: hidden;
 
-  constructor(width: number, height: number) {
-    this.width = width;
-    this.height = height;
+  .bar-chart-tooltip {
+    position: absolute;
+    left: 20px;
+    right: 0;
+
+    div {
+      display: inline-block;
+      width: 230px;
+    }
   }
 
-  public equals(other: Stage | undefined): boolean {
-    return Boolean(other && this.width === other.width && this.height === other.height);
+  svg {
+    position: absolute;
+
+    .chart-axis text {
+      user-select: none;
+    }
+
+    .hovered-bar {
+      fill: transparent;
+      stroke: #ffffff;
+      stroke-width: 1.5px;
+    }
+
+    .gridline-x {
+      line {
+        stroke-dasharray: 5, 5;
+        opacity: 0.5;
+      }
+    }
   }
 }

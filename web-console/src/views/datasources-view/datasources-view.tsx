@@ -51,8 +51,9 @@ import type {
   CompactionInfo,
   CompactionStatus,
   QueryWithContext,
+  Rule,
 } from '../../druid-models';
-import { formatCompactionInfo, zeroCompactionStatus } from '../../druid-models';
+import { formatCompactionInfo, RuleUtil, zeroCompactionStatus } from '../../druid-models';
 import type { Capabilities, CapabilitiesMode } from '../../helpers';
 import { STANDARD_TABLE_PAGE_SIZE, STANDARD_TABLE_PAGE_SIZE_OPTIONS } from '../../react-table';
 import { Api, AppToaster } from '../../singletons';
@@ -82,8 +83,6 @@ import {
   twoLines,
 } from '../../utils';
 import type { BasicAction } from '../../utils/basic-action';
-import type { Rule } from '../../utils/load-rule';
-import { RuleUtil } from '../../utils/load-rule';
 
 import './datasources-view.scss';
 

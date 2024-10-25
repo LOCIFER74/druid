@@ -32,6 +32,7 @@ export * from './ingest-query-pattern/ingest-query-pattern';
 export * from './ingestion-spec/ingestion-spec';
 export * from './input-format/input-format';
 export * from './input-source/input-source';
+export * from './load-rule/load-rule';
 export * from './lookup-spec/lookup-spec';
 export * from './metric-spec/metric-spec';
 export * from './overlord-dynamic-config/overlord-dynamic-config';

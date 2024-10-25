@@ -20,7 +20,8 @@ import type { IconName } from '@blueprintjs/icons';
 import type { QueryResult, SqlExpression, SqlQuery } from '@druid-toolkit/query';
 import type { CancelToken } from 'axios';
 
-import type { ParameterDefinition, QuerySource, Stage } from '../models';
+import type { Stage } from '../../../utils/stage';
+import type { ParameterDefinition, QuerySource } from '../models';
 
 interface ModuleDefinition<P> {
   id: string;

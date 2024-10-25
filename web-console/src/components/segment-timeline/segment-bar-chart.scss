@@ -16,35 +16,6 @@
  * limitations under the License.
  */
 
-.stacked-bar-chart {
+.segment-bar-chart {
   position: relative;
-  overflow: hidden;
-
-  .bar-chart-tooltip {
-    position: absolute;
-    left: 100px;
-    right: 0;
-
-    div {
-      display: inline-block;
-      width: 230px;
-    }
-  }
-
-  svg {
-    position: absolute;
-
-    .hovered-bar {
-      fill: transparent;
-      stroke: #ffffff;
-      stroke-width: 1.5px;
-    }
-
-    .gridline-x {
-      line {
-        stroke-dasharray: 5, 5;
-        opacity: 0.5;
-      }
-    }
-  }
 }

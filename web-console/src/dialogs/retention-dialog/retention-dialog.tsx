@@ -22,12 +22,12 @@ import React, { useState } from 'react';
 
 import type { FormJsonTabs } from '../../components';
 import { ExternalLink, FormJsonSelector, JsonInput, RuleEditor } from '../../components';
+import type { Rule } from '../../druid-models';
 import type { Capabilities } from '../../helpers';
 import { useQueryManager } from '../../hooks';
 import { getLink } from '../../links';
 import { Api } from '../../singletons';
 import { filterMap, queryDruidSql, swapElements } from '../../utils';
-import type { Rule } from '../../utils/load-rule';
 import { SnitchDialog } from '..';
 
 import './retention-dialog.scss';
