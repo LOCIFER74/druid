@@ -44,6 +44,12 @@
       stroke-width: 1.5px;
     }
 
+    .selection {
+      fill: transparent;
+      stroke: #ffffff;
+      stroke-width: 1px;
+    }
+
     .gridline-x {
       line {
         stroke-dasharray: 5, 5;

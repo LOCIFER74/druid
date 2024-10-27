@@ -18,7 +18,6 @@
 
 import type { Axis } from 'd3-axis';
 import { select } from 'd3-selection';
-import React from 'react';
 
 interface ChartAxisProps {
   transform?: string;
@@ -26,7 +25,7 @@ interface ChartAxisProps {
   className?: string;
 }
 
-export const ChartAxis = React.memo(function ChartAxis(props: ChartAxisProps) {
+export const ChartAxis = function ChartAxis(props: ChartAxisProps) {
   const { transform, axis, className } = props;
   return (
     <g
@@ -35,4 +34,4 @@ export const ChartAxis = React.memo(function ChartAxis(props: ChartAxisProps) {
       ref={node => select(node).call(axis as any)}
     />
   );
-});
+};

@@ -23,7 +23,17 @@ import { C, F, SqlExpression } from '@druid-toolkit/query';
 import type { JSX } from 'react';
 import React from 'react';
 
-import { prettyPrintSql } from '../../../../../utils';
+import {
+  floorDay,
+  floorHour,
+  floorMonth,
+  floorYear,
+  nextDay,
+  nextHour,
+  nextMonth,
+  nextYear,
+  prettyPrintSql,
+} from '../../../../../utils';
 
 const LATEST_HOUR: SqlExpression = SqlExpression.parse(
   `? >= CURRENT_TIMESTAMP - INTERVAL '1' HOUR`,
@@ -50,58 +60,6 @@ function fillWithColumn(b: SqlExpression, columnName: string): SqlExpression {
 function fillWithColumnStartEnd(columnName: string, start: Date, end: Date): SqlExpression {
   const column = C(columnName);
   return BETWEEN.fillPlaceholders([start, column, column, end]);
-}
-
-// ------------------------------------
-
-function floorHour(dt: Date): Date {
-  dt = new Date(dt.valueOf());
-  dt.setUTCMinutes(0, 0, 0);
-  return dt;
-}
-
-function nextHour(dt: Date): Date {
-  dt = new Date(dt.valueOf());
-  dt.setUTCHours(dt.getUTCHours() + 1);
-  return dt;
-}
-
-function floorDay(dt: Date): Date {
-  dt = new Date(dt.valueOf());
-  dt.setUTCHours(0, 0, 0, 0);
-  return dt;
-}
-
-function nextDay(dt: Date): Date {
-  dt = new Date(dt.valueOf());
-  dt.setUTCDate(dt.getUTCDate() + 1);
-  return dt;
-}
-
-function floorMonth(dt: Date): Date {
-  dt = new Date(dt.valueOf());
-  dt.setUTCHours(0, 0, 0, 0);
-  dt.setUTCDate(1);
-  return dt;
-}
-
-function nextMonth(dt: Date): Date {
-  dt = new Date(dt.valueOf());
-  dt.setUTCMonth(dt.getUTCMonth() + 1);
-  return dt;
-}
-
-function floorYear(dt: Date): Date {
-  dt = new Date(dt.valueOf());
-  dt.setUTCHours(0, 0, 0, 0);
-  dt.setUTCMonth(0, 1);
-  return dt;
-}
-
-function nextYear(dt: Date): Date {
-  dt = new Date(dt.valueOf());
-  dt.setUTCFullYear(dt.getUTCFullYear() + 1);
-  return dt;
 }
 
 export interface TimeMenuItemsProps {

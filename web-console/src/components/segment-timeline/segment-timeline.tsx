@@ -126,8 +126,9 @@ export const SegmentTimeline = function SegmentTimeline(props: SegmentTimelinePr
               capabilities={capabilities}
               stage={stage}
               dateRange={dateRange}
+              changeDateRange={setDateRange}
               shownSegmentStat={activeSegmentStat}
-              breakByDataSource={false}
+              breakByDataSource
               changeActiveDatasource={(datasource: string | undefined) =>
                 setActiveDatasource(activeDatasource ? undefined : datasource)
               }
@@ -145,6 +146,10 @@ export const SegmentTimeline = function SegmentTimeline(props: SegmentTimelinePr
               {
                 label: 'Size',
                 value: 'size',
+              },
+              {
+                label: 'Rows',
+                value: 'rows',
               },
               {
                 label: 'Count',

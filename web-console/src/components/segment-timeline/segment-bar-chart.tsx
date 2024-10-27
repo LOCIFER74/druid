@@ -18,47 +18,101 @@
 
 import type { NonNullDateRange } from '@blueprintjs/datetime';
 import { C, F, N, sql, SqlQuery } from '@druid-toolkit/query';
-import { sum } from 'd3-array';
+import IntervalTree from '@flatten-js/interval-tree';
 import { useMemo } from 'react';
 
 import type { Capabilities } from '../../helpers';
 import { useQueryManager } from '../../hooks';
 import { Api } from '../../singletons';
-import { filterMap, groupBy, queryDruidSql } from '../../utils';
+import {
+  ceilDay,
+  ceilHour,
+  ceilMonth,
+  ceilYear,
+  filterMap,
+  floorDay,
+  floorHour,
+  floorMonth,
+  floorYear,
+  groupBy,
+  queryDruidSql,
+} from '../../utils';
 import type { Stage } from '../../utils/stage';
 import { Loader } from '../loader/loader';
 
 import type { SegmentBar, SegmentRow, SegmentStat } from './common';
+import { aggregateSegmentStats, normalizedSegmentRow } from './common';
 import { SegmentBarChartRender } from './segment-bar-chart-render';
 
 import './segment-bar-chart.scss';
 
 type TrimDuration = 'PT1H' | 'P1D' | 'P1M' | 'P1Y';
 
-function trimUtcDate(date: string, duration: TrimDuration): string {
-  // date like 2024-09-26T00:00:00.000Z
+function floorToDuration(date: Date, duration: TrimDuration): Date {
   switch (duration) {
     case 'PT1H':
-      return date.substring(0, 13) + ':00:00Z';
+      return floorHour(date);
 
     case 'P1D':
-      return date.substring(0, 10) + 'T00:00:00Z';
+      return floorDay(date);
 
     case 'P1M':
-      return date.substring(0, 7) + '-01T00:00:00Z';
+      return floorMonth(date);
 
     case 'P1Y':
-      return date.substring(0, 4) + '-01-01T00:00:00Z';
+      return floorYear(date);
 
     default:
       throw new Error(`Unexpected duration: ${duration}`);
   }
 }
 
+function ceilToDuration(date: Date, duration: TrimDuration): Date {
+  switch (duration) {
+    case 'PT1H':
+      return ceilHour(date);
+
+    case 'P1D':
+      return ceilDay(date);
+
+    case 'P1M':
+      return ceilMonth(date);
+
+    case 'P1Y':
+      return ceilYear(date);
+
+    default:
+      throw new Error(`Unexpected duration: ${duration}`);
+  }
+}
+
+function stackSegmentRows(segmentRows: SegmentRow[]): SegmentBar[] {
+  const sorted = segmentRows.sort((a, b) => {
+    const diff = b.durationSeconds - a.durationSeconds;
+    if (diff) return diff;
+    if (!a.datasource || !b.datasource) return 0;
+    return b.datasource.localeCompare(a.datasource);
+  });
+
+  const intervalTree = new IntervalTree();
+  return sorted.map(segmentRow => {
+    segmentRow = normalizedSegmentRow(segmentRow);
+    const startMs = segmentRow.start.valueOf();
+    const endMs = segmentRow.end.valueOf();
+    const segmentRowsBelow = intervalTree.search([startMs + 1, startMs + 2]) as SegmentRow[];
+    intervalTree.insert([startMs, endMs], segmentRow);
+    return {
+      ...segmentRow,
+      offset: aggregateSegmentStats(segmentRowsBelow),
+    };
+  });
+}
+
 interface SegmentBarChartProps {
   capabilities: Capabilities;
   stage: Stage;
   dateRange: NonNullDateRange;
+  changeDateRange(newDateRange: NonNullDateRange): void;
   breakByDataSource: boolean;
   shownSegmentStat: SegmentStat;
   changeActiveDatasource: (datasource: string | undefined) => void;
@@ -68,6 +122,7 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
   const {
     capabilities,
     dateRange,
+    changeDateRange,
     breakByDataSource,
     stage,
     shownSegmentStat,
@@ -82,6 +137,7 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
   const [segmentRowsState] = useQueryManager({
     query: intervalsQuery,
     processQuery: async ({ capabilities, dateRange, breakByDataSource }, cancelToken) => {
+      const trimDuration: TrimDuration = 'PT1H';
       let segmentRows: SegmentRow[];
       if (capabilities.hasSql()) {
         const query = SqlQuery.from(N('sys').table('segments'))
@@ -95,7 +151,16 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
           .addSelect(F.sum(C('size')).as('size'))
           .addSelect(F.sum(C('num_rows')).as('rows'));
 
-        segmentRows = await queryDruidSql({ query: query.toString() });
+        segmentRows = (await queryDruidSql({ query: query.toString() })).map(sr => {
+          const start = floorToDuration(new Date(sr.start), trimDuration);
+          const end = ceilToDuration(new Date(sr.end), trimDuration);
+          return {
+            ...sr,
+            start,
+            end,
+            durationSeconds: (end.valueOf() - start.valueOf()) / 1000,
+          };
+        }); // This trimming should ideally be pushed into the SQL query but at the time of this writing queries on the sys.* tables do not allow substring
       } else {
         const datasources: string[] = (
           await Api.instance.get(`/druid/coordinator/v1/datasources`, { cancelToken })
@@ -114,11 +179,14 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
 
               return filterMap(Object.entries(intervalMap), ([interval, v]) => {
                 // ToDo: Filter on start end
-                const [start, end] = interval.split('/');
+                const [startStr, endStr] = interval.split('/');
+                const start = floorToDuration(new Date(startStr), trimDuration);
+                const end = ceilToDuration(new Date(endStr), trimDuration);
                 const { count, size, rows } = v as any;
                 return {
                   start,
                   end,
+                  durationSeconds: (end.valueOf() - start.valueOf()) / 1000,
                   datasource: breakByDataSource ? datasource : undefined,
                   count,
                   size,
@@ -130,31 +198,23 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
         ).flat();
       }
 
-      const trimDuration: TrimDuration = 'P1D';
-      return groupBy(
+      const fullyGroupedSegmentRows = groupBy(
         segmentRows,
         segmentRow =>
-          // This trimming should ideally be pushed into the SQL query but at the time of this writing queries on the sys.* tables do not allow substring
-          `${trimUtcDate(segmentRow.start, trimDuration)}/${trimUtcDate(
-            segmentRow.end,
-            trimDuration,
-          )}/${segmentRow.datasource || ''}`,
-        (segmentRows): SegmentBar => {
-          const firstRow = segmentRows[0];
-          const start = trimUtcDate(firstRow.start, trimDuration);
-          const end = trimUtcDate(firstRow.end, trimDuration);
+          [
+            segmentRow.start.toISOString(),
+            segmentRow.end.toISOString(),
+            segmentRow.datasource || '',
+          ].join('/'),
+        (segmentRows): SegmentRow => {
           return {
-            ...firstRow,
-            start,
-            startDate: new Date(start),
-            end,
-            endDate: new Date(end),
-            count: sum(segmentRows, s => s.count),
-            size: sum(segmentRows, s => s.size),
-            rows: sum(segmentRows, s => s.rows),
+            ...segmentRows[0],
+            ...aggregateSegmentStats(segmentRows),
           };
         },
       );
+
+      return stackSegmentRows(fullyGroupedSegmentRows);
     },
   });
 
@@ -181,13 +241,13 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
     );
   }
 
-  console.log(segmentRows);
   return (
     <SegmentBarChartRender
       stage={stage}
       dateRange={dateRange}
+      changeDateRange={changeDateRange}
       shownSegmentStat={shownSegmentStat}
-      segmentBars={segmentRows}
+      segmentBars={segmentRows as any}
       changeActiveDatasource={changeActiveDatasource}
     />
   );

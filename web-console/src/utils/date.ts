@@ -105,3 +105,85 @@ export function ceilToUtcDay(date: Date): Date {
   date.setUTCDate(date.getUTCDate() + 1);
   return date;
 }
+
+// ------------------------------------
+
+export function floorHour(dt: Date): Date {
+  dt = new Date(dt.valueOf());
+  dt.setUTCMinutes(0, 0, 0);
+  return dt;
+}
+
+export function nextHour(dt: Date): Date {
+  dt = new Date(dt.valueOf());
+  dt.setUTCHours(dt.getUTCHours() + 1);
+  return dt;
+}
+
+export function ceilHour(dt: Date): Date {
+  const floor = floorHour(dt);
+  if (floor.valueOf() === dt.valueOf()) return dt;
+  return nextHour(floor);
+}
+
+// ------------------------------------
+
+export function floorDay(dt: Date): Date {
+  dt = new Date(dt.valueOf());
+  dt.setUTCHours(0, 0, 0, 0);
+  return dt;
+}
+
+export function nextDay(dt: Date): Date {
+  dt = new Date(dt.valueOf());
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt;
+}
+
+export function ceilDay(dt: Date): Date {
+  const floor = floorDay(dt);
+  if (floor.valueOf() === dt.valueOf()) return dt;
+  return nextDay(floor);
+}
+
+// ------------------------------------
+
+export function floorMonth(dt: Date): Date {
+  dt = new Date(dt.valueOf());
+  dt.setUTCHours(0, 0, 0, 0);
+  dt.setUTCDate(1);
+  return dt;
+}
+
+export function nextMonth(dt: Date): Date {
+  dt = new Date(dt.valueOf());
+  dt.setUTCMonth(dt.getUTCMonth() + 1);
+  return dt;
+}
+
+export function ceilMonth(dt: Date): Date {
+  const floor = floorMonth(dt);
+  if (floor.valueOf() === dt.valueOf()) return dt;
+  return nextMonth(floor);
+}
+
+// ------------------------------------
+
+export function floorYear(dt: Date): Date {
+  dt = new Date(dt.valueOf());
+  dt.setUTCHours(0, 0, 0, 0);
+  dt.setUTCMonth(0, 1);
+  return dt;
+}
+
+export function nextYear(dt: Date): Date {
+  dt = new Date(dt.valueOf());
+  dt.setUTCFullYear(dt.getUTCFullYear() + 1);
+  return dt;
+}
+
+export function ceilYear(dt: Date): Date {
+  const floor = floorYear(dt);
+  if (floor.valueOf() === dt.valueOf()) return dt;
+  return nextYear(floor);
+}

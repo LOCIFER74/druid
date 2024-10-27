@@ -18,12 +18,13 @@
 
 import type { NonNullDateRange } from '@blueprintjs/datetime';
 import { max } from 'd3-array';
-import type { AxisScale } from 'd3-axis';
 import { axisBottom, axisLeft } from 'd3-axis';
 import { scaleLinear, scaleUtc } from 'd3-scale';
-import { useState } from 'react';
+import type React from 'react';
+import { useRef, useState } from 'react';
 
-import { formatBytes, formatInteger } from '../../utils';
+import { useGlobalEventListener } from '../../hooks';
+import { ceilDay, floorDay, formatBytes, formatInteger } from '../../utils';
 import type { Margin, Stage } from '../../utils/stage';
 
 import { ChartAxis } from './chart-axis';
@@ -31,11 +32,31 @@ import type { SegmentBar, SegmentStat } from './common';
 
 import './segment-bar-chart-render.scss';
 
-const CHART_MARGIN: Margin = { top: 40, right: 5, bottom: 20, left: 60 };
+const CHART_MARGIN: Margin = { top: 40, right: 5, bottom: 20, left: 10 };
+
+const COLORS = [
+  '#b33040',
+  '#d25c4d',
+  '#f2b447',
+  '#d9d574',
+  '#4FAA7E',
+  '#57ceff',
+  '#789113',
+  '#098777',
+  '#b33040',
+  '#d2757b',
+  '#f29063',
+  '#d9a241',
+  '#80aa61',
+  '#c4ff9e',
+  '#915412',
+  '#87606c',
+];
 
 interface SegmentBarChartRenderProps {
   stage: Stage;
   dateRange: NonNullDateRange;
+  changeDateRange(newDateRange: NonNullDateRange): void;
   shownSegmentStat: SegmentStat;
   segmentBars: SegmentBar[];
   changeActiveDatasource(datasource: string | undefined): void;
@@ -44,15 +65,25 @@ interface SegmentBarChartRenderProps {
 export const SegmentBarChartRender = function SegmentBarChartRender(
   props: SegmentBarChartRenderProps,
 ) {
-  const { stage, shownSegmentStat, dateRange, segmentBars, changeActiveDatasource } = props;
+  const {
+    stage,
+    shownSegmentStat,
+    dateRange,
+    changeDateRange,
+    segmentBars,
+    changeActiveDatasource,
+  } = props;
   const [hoverOn, setHoverOn] = useState<SegmentBar>();
+  const [mouseDownAt, setMouseDownAt] = useState<Date | undefined>();
+  const [dragging, setDragging] = useState<NonNullDateRange | undefined>();
+  const svgRef = useRef<SVGSVGElement | null>(null);
 
   const innerStage = stage.applyMargin(CHART_MARGIN);
 
-  const timeScale: AxisScale<Date> = scaleUtc().domain(dateRange).range([0, innerStage.width]);
+  const timeScale = scaleUtc().domain(dateRange).range([0, innerStage.width]);
 
-  const maxStat = max(segmentBars, d => d[shownSegmentStat]);
-  const statScale: AxisScale<number> = scaleLinear()
+  const maxStat = max(segmentBars, d => d[shownSegmentStat] + d.offset[shownSegmentStat]);
+  const statScale = scaleLinear()
     .rangeRound([innerStage.height, 0])
     .domain([0, maxStat ?? 1]);
 
@@ -65,11 +96,43 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
     }
   };
 
+  function handleMouseDown(e: React.MouseEvent) {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const x = e.clientX - rect.x - CHART_MARGIN.left;
+    setMouseDownAt(timeScale.invert(x));
+  }
+
+  useGlobalEventListener('mousemove', (e: MouseEvent) => {
+    if (!mouseDownAt) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const x = e.clientX - rect.x - CHART_MARGIN.left;
+    const b = timeScale.invert(x);
+    if (mouseDownAt < b) {
+      setDragging([floorDay(mouseDownAt), ceilDay(b)]);
+    } else {
+      setDragging([floorDay(b), ceilDay(mouseDownAt)]);
+    }
+  });
+
+  useGlobalEventListener('mouseup', () => {
+    if (mouseDownAt) {
+      setMouseDownAt(undefined);
+    }
+    if (dragging) {
+      setDragging(undefined);
+      changeDateRange(dragging);
+    }
+  });
+
   function segmentBarToRect(segmentBar: SegmentBar) {
-    const y0 = statScale(0)!; // segmentBar.y0 ||
-    const xStart = timeScale(segmentBar.startDate)!;
-    const xEnd = timeScale(segmentBar.endDate)!;
-    const y = statScale(segmentBar[shownSegmentStat]) || 0;
+    const xStart = timeScale(segmentBar.start);
+    const xEnd = timeScale(segmentBar.end);
+    const y0 = statScale(segmentBar.offset[shownSegmentStat]);
+    const y = statScale(segmentBar[shownSegmentStat] + segmentBar.offset[shownSegmentStat]);
 
     return {
       x: xStart,
@@ -81,22 +144,29 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
 
   return (
     <div className="segment-bar-chart-render">
-      {hoverOn && (
+      {dragging ? (
+        <div className="bar-chart-tooltip">
+          <div>Start: {dragging[0].toISOString()}</div>
+          <div>End: {dragging[1].toISOString()}</div>
+        </div>
+      ) : hoverOn ? (
         <div className="bar-chart-tooltip">
           <div>Datasource: {hoverOn.datasource}</div>
-          <div>Time: {hoverOn.start}</div>
+          <div>Time: {hoverOn.start.toISOString()}</div>
           <div>
             {`${shownSegmentStat === 'count' ? 'Count' : 'Size'}: ${formatTick(
-              hoverOn[shownSegmentStat],
+              hoverOn[shownSegmentStat] * hoverOn.durationSeconds,
             )}`}
           </div>
         </div>
-      )}
+      ) : undefined}
       <svg
+        ref={svgRef}
         width={stage.width}
         height={stage.height}
         viewBox={`0 0 ${stage.width} ${stage.height}`}
         preserveAspectRatio="xMinYMin meet"
+        onMouseDown={handleMouseDown}
       >
         <g
           transform={`translate(${CHART_MARGIN.left},${CHART_MARGIN.top})`}
@@ -116,38 +186,43 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
             transform={`translate(0,${innerStage.height})`}
             axis={axisBottom(timeScale)}
           />
-          <ChartAxis
-            className="axis-y"
-            axis={axisLeft(statScale)
-              .ticks(5)
-              .tickFormat(e => formatTick(e))}
-          />
-          {segmentBars.map((segmentBar, i) => {
-            return (
+          <g className="bar-group">
+            {segmentBars.map((segmentBar, i) => {
+              return (
+                <rect
+                  key={i}
+                  className="bar-unit"
+                  {...segmentBarToRect(segmentBar)}
+                  style={{ fill: COLORS[i % COLORS.length] }}
+                  onClick={
+                    segmentBar.datasource
+                      ? () => changeActiveDatasource(segmentBar.datasource)
+                      : undefined
+                  }
+                  onMouseOver={() => setHoverOn(segmentBar)}
+                />
+              );
+            })}
+            {hoverOn && (
               <rect
-                key={i}
-                className="bar-unit"
-                {...segmentBarToRect(segmentBar)}
-                style={{ fill: i % 2 ? 'red' : 'blue' }}
-                onClick={
-                  segmentBar.datasource
-                    ? () => changeActiveDatasource(segmentBar.datasource)
-                    : undefined
-                }
-                onMouseOver={() => setHoverOn(segmentBar)}
+                className="hovered-bar"
+                {...segmentBarToRect(hoverOn)}
+                onClick={() => {
+                  setHoverOn(undefined);
+                  changeActiveDatasource(hoverOn.datasource);
+                }}
               />
-            );
-          })}
-          {hoverOn && (
-            <rect
-              className="hovered-bar"
-              {...segmentBarToRect(hoverOn)}
-              onClick={() => {
-                setHoverOn(undefined);
-                changeActiveDatasource(hoverOn.datasource);
-              }}
-            />
-          )}
+            )}
+            {(dragging || mouseDownAt) && (
+              <rect
+                className="selection"
+                x={timeScale(dragging?.[0] || mouseDownAt!)}
+                y={0}
+                height={innerStage.height}
+                width={dragging ? timeScale(dragging[1]) - timeScale(dragging[0]) : 1}
+              />
+            )}
+          </g>
         </g>
       </svg>
     </div>

@@ -656,3 +656,12 @@ export function offsetToRowColumn(str: string, offset: number): RowColumn | unde
 
   return;
 }
+
+export function findParentSVG(element: Element): SVGElement | undefined {
+  let currentElement: Element | null = element;
+  while (currentElement) {
+    if (currentElement.tagName === 'svg') return currentElement as SVGElement;
+    currentElement = currentElement.parentElement;
+  }
+  return;
+}

@@ -16,19 +16,36 @@
  * limitations under the License.
  */
 
+import { sum } from 'd3-array';
+
 export type SegmentStat = 'count' | 'size' | 'rows';
 
+export function aggregateSegmentStats(
+  xs: readonly Record<SegmentStat, number>[],
+): Record<SegmentStat, number> {
+  return {
+    count: sum(xs, s => s.count),
+    size: sum(xs, s => s.size),
+    rows: sum(xs, s => s.rows),
+  };
+}
+
 export interface SegmentRow extends Record<SegmentStat, number> {
-  start: string;
-  end: string;
+  start: Date;
+  end: Date;
+  durationSeconds: number;
   datasource?: string;
 }
 
 export interface SegmentBar extends SegmentRow {
-  startDate: Date;
-  endDate: Date;
+  offset: Record<SegmentStat, number>;
 }
 
-export interface StackedSegmentBar extends SegmentBar {
-  offset: Record<SegmentStat, number>;
+export function normalizedSegmentRow(sr: SegmentRow): SegmentRow {
+  return {
+    ...sr,
+    count: sr.count / sr.durationSeconds,
+    size: sr.size / sr.durationSeconds,
+    rows: sr.rows / sr.durationSeconds,
+  };
 }
