@@ -17,14 +17,24 @@
  */
 
 import type { NonNullDateRange } from '@blueprintjs/datetime';
+import classNames from 'classnames';
 import { max } from 'd3-array';
 import { axisBottom, axisLeft } from 'd3-axis';
-import { scaleLinear, scaleUtc } from 'd3-scale';
+import { scaleLinear, scaleOrdinal, scaleUtc } from 'd3-scale';
 import type React from 'react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { useGlobalEventListener } from '../../hooks';
-import { ceilDay, floorDay, formatBytes, formatInteger } from '../../utils';
+import {
+  capitalizeFirst,
+  ceilDay,
+  clamp,
+  floorDay,
+  formatByteRate,
+  formatBytes,
+  formatInteger,
+  formatNumber,
+} from '../../utils';
 import type { Margin, Stage } from '../../utils/stage';
 
 import { ChartAxis } from './chart-axis';
@@ -32,7 +42,7 @@ import type { SegmentBar, SegmentStat } from './common';
 
 import './segment-bar-chart-render.scss';
 
-const CHART_MARGIN: Margin = { top: 40, right: 5, bottom: 20, left: 10 };
+const CHART_MARGIN: Margin = { top: 40, right: 5, bottom: 20, left: 80 };
 
 const COLORS = [
   '#b33040',
@@ -53,10 +63,14 @@ const COLORS = [
   '#87606c',
 ];
 
+function offsetDateRange(dateRange: NonNullDateRange, offset: number): NonNullDateRange {
+  return [new Date(dateRange[0].valueOf() + offset), new Date(dateRange[1].valueOf() + offset)];
+}
+
 interface SegmentBarChartRenderProps {
   stage: Stage;
   dateRange: NonNullDateRange;
-  changeDateRange(newDateRange: NonNullDateRange): void;
+  changeDateRange(dateRange: NonNullDateRange): void;
   shownSegmentStat: SegmentStat;
   segmentBars: SegmentBar[];
   changeActiveDatasource(datasource: string | undefined): void;
@@ -74,13 +88,25 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
     changeActiveDatasource,
   } = props;
   const [hoverOn, setHoverOn] = useState<SegmentBar>();
-  const [mouseDownAt, setMouseDownAt] = useState<Date | undefined>();
+  const [mouseDownAt, setMouseDownAt] = useState<
+    { time: Date; action: 'select' | 'shift' } | undefined
+  >();
   const [dragging, setDragging] = useState<NonNullDateRange | undefined>();
+  const [shiftOffset, setShiftOffset] = useState<number | undefined>();
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   const innerStage = stage.applyMargin(CHART_MARGIN);
 
-  const timeScale = scaleUtc().domain(dateRange).range([0, innerStage.width]);
+  const baseTimeScale = scaleUtc().domain(dateRange).range([0, innerStage.width]);
+
+  const timeScale = shiftOffset
+    ? baseTimeScale.copy().domain(offsetDateRange(dateRange, shiftOffset))
+    : baseTimeScale;
+
+  const colorizer = useMemo(() => {
+    const s = scaleOrdinal().range(COLORS);
+    return (d: SegmentBar) => (d.datasource ? s(d.datasource) : COLORS[0]) as string;
+  }, []);
 
   const maxStat = max(segmentBars, d => d[shownSegmentStat] + d.offset[shownSegmentStat]);
   const statScale = scaleLinear()
@@ -88,11 +114,26 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
     .domain([0, maxStat ?? 1]);
 
   const formatTick = (n: number) => {
-    if (isNaN(n)) return '';
-    if (shownSegmentStat === 'count') {
-      return formatInteger(n);
-    } else {
-      return formatBytes(n);
+    switch (shownSegmentStat) {
+      case 'count':
+      case 'rows':
+        return formatInteger(n);
+
+      case 'size':
+        return formatBytes(n);
+    }
+  };
+
+  const formatTickRate = (n: number) => {
+    switch (shownSegmentStat) {
+      case 'count':
+        return formatNumber(n) + ' seg/s';
+
+      case 'rows':
+        return formatNumber(n) + ' row/s';
+
+      case 'size':
+        return formatByteRate(n);
     }
   };
 
@@ -101,7 +142,11 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
     const x = e.clientX - rect.x - CHART_MARGIN.left;
-    setMouseDownAt(timeScale.invert(x));
+    const y = e.clientY - rect.y - CHART_MARGIN.top;
+    setMouseDownAt({
+      time: baseTimeScale.invert(x),
+      action: y > innerStage.height ? 'shift' : 'select',
+    });
   }
 
   useGlobalEventListener('mousemove', (e: MouseEvent) => {
@@ -110,34 +155,46 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
     const x = e.clientX - rect.x - CHART_MARGIN.left;
-    const b = timeScale.invert(x);
-    if (mouseDownAt < b) {
-      setDragging([floorDay(mouseDownAt), ceilDay(b)]);
+    const b = baseTimeScale.invert(x);
+    if (mouseDownAt.action === 'shift' || e.shiftKey) {
+      setShiftOffset(mouseDownAt.time.valueOf() - b.valueOf());
     } else {
-      setDragging([floorDay(b), ceilDay(mouseDownAt)]);
+      if (mouseDownAt.time < b) {
+        setDragging([floorDay(mouseDownAt.time), ceilDay(b)]);
+      } else {
+        setDragging([floorDay(b), ceilDay(mouseDownAt.time)]);
+      }
     }
   });
 
-  useGlobalEventListener('mouseup', () => {
-    if (mouseDownAt) {
-      setMouseDownAt(undefined);
-    }
-    if (dragging) {
-      setDragging(undefined);
-      changeDateRange(dragging);
+  useGlobalEventListener('mouseup', (e: MouseEvent) => {
+    if (!mouseDownAt) return;
+    setMouseDownAt(undefined);
+
+    if (!shiftOffset && !dragging) return;
+    setDragging(undefined);
+    setShiftOffset(undefined);
+    if (mouseDownAt.action === 'shift' || e.shiftKey) {
+      if (shiftOffset) {
+        changeDateRange(offsetDateRange(dateRange, shiftOffset));
+      }
+    } else {
+      if (dragging) {
+        changeDateRange(dragging);
+      }
     }
   });
 
   function segmentBarToRect(segmentBar: SegmentBar) {
-    const xStart = timeScale(segmentBar.start);
-    const xEnd = timeScale(segmentBar.end);
+    const xStart = clamp(timeScale(segmentBar.start), 0, innerStage.width);
+    const xEnd = clamp(timeScale(segmentBar.end), 0, innerStage.width);
     const y0 = statScale(segmentBar.offset[shownSegmentStat]);
     const y = statScale(segmentBar[shownSegmentStat] + segmentBar.offset[shownSegmentStat]);
 
     return {
       x: xStart,
       y: y,
-      width: Math.max(xEnd - xStart, 1),
+      width: Math.max(xEnd - xStart - 1, 1),
       height: Math.abs(y0 - y),
     };
   }
@@ -154,7 +211,7 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
           <div>Datasource: {hoverOn.datasource}</div>
           <div>Time: {hoverOn.start.toISOString()}</div>
           <div>
-            {`${shownSegmentStat === 'count' ? 'Count' : 'Size'}: ${formatTick(
+            {`${capitalizeFirst(shownSegmentStat)}: ${formatTick(
               hoverOn[shownSegmentStat] * hoverOn.durationSeconds,
             )}`}
           </div>
@@ -186,6 +243,21 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
             transform={`translate(0,${innerStage.height})`}
             axis={axisBottom(timeScale)}
           />
+          <rect
+            className={classNames('time-shift-indicator', {
+              shifting: typeof shiftOffset === 'number',
+            })}
+            x={0}
+            y={innerStage.height}
+            width={innerStage.width}
+            height={CHART_MARGIN.bottom}
+          />
+          <ChartAxis
+            className="axis-y"
+            axis={axisLeft(statScale)
+              .ticks(5)
+              .tickFormat(e => formatTickRate(e.valueOf()))}
+          />
           <g className="bar-group">
             {segmentBars.map((segmentBar, i) => {
               return (
@@ -193,13 +265,16 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
                   key={i}
                   className="bar-unit"
                   {...segmentBarToRect(segmentBar)}
-                  style={{ fill: COLORS[i % COLORS.length] }}
+                  style={{ fill: colorizer(segmentBar) }}
                   onClick={
                     segmentBar.datasource
                       ? () => changeActiveDatasource(segmentBar.datasource)
                       : undefined
                   }
-                  onMouseOver={() => setHoverOn(segmentBar)}
+                  onMouseOver={() => {
+                    if (mouseDownAt) return;
+                    setHoverOn(segmentBar);
+                  }}
                 />
               );
             })}
@@ -213,13 +288,24 @@ export const SegmentBarChartRender = function SegmentBarChartRender(
                 }}
               />
             )}
-            {(dragging || mouseDownAt) && (
+            {dragging && (
               <rect
                 className="selection"
-                x={timeScale(dragging?.[0] || mouseDownAt!)}
+                x={timeScale(dragging[0])}
                 y={0}
                 height={innerStage.height}
-                width={dragging ? timeScale(dragging[1]) - timeScale(dragging[0]) : 1}
+                width={timeScale(dragging[1]) - timeScale(dragging[0])}
+              />
+            )}
+            {!!shiftOffset && (
+              <rect
+                className="shifter"
+                x={timeScale(shiftOffset > 0 ? dateRange[1] : dateRange[0].valueOf() + shiftOffset)}
+                y={0}
+                height={innerStage.height}
+                width={Math.abs(
+                  timeScale(dateRange[0]) - timeScale(dateRange[0].valueOf() + shiftOffset),
+                )}
               />
             )}
           </g>

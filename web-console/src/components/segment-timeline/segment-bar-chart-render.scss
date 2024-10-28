@@ -50,6 +50,27 @@
       stroke-width: 1px;
     }
 
+    .shifter {
+      fill: white;
+      fill-opacity: 0.2;
+      filter: blur(1px);
+    }
+
+    .time-shift-indicator {
+      fill: white;
+      fill-opacity: 0.001;
+      cursor: grab;
+
+      &:hover {
+        fill-opacity: 0.1;
+      }
+
+      &.shifting {
+        fill-opacity: 0.2;
+        cursor: grabbing;
+      }
+    }
+
     .gridline-x {
       line {
         stroke-dasharray: 5, 5;

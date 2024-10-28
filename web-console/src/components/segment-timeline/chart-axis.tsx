@@ -20,9 +20,9 @@ import type { Axis } from 'd3-axis';
 import { select } from 'd3-selection';
 
 interface ChartAxisProps {
+  className?: string;
   transform?: string;
   axis: Axis<any>;
-  className?: string;
 }
 
 export const ChartAxis = function ChartAxis(props: ChartAxisProps) {

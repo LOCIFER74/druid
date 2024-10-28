@@ -134,7 +134,7 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
     [capabilities, dateRange, breakByDataSource],
   );
 
-  const [segmentRowsState] = useQueryManager({
+  const [segmentBarsState] = useQueryManager({
     query: intervalsQuery,
     processQuery: async ({ capabilities, dateRange, breakByDataSource }, cancelToken) => {
       const trimDuration: TrimDuration = 'PT1H';
@@ -142,7 +142,7 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
       if (capabilities.hasSql()) {
         const query = SqlQuery.from(N('sys').table('segments'))
           .changeWhereExpression(
-            sql`'${dateRange[0].toISOString()}' <= "start" AND "end" <= '${dateRange[1].toISOString()}' AND is_published = 1 AND is_overshadowed = 0`,
+            sql`'${dateRange[0].toISOString()}' <= "end" AND "start" <= '${dateRange[1].toISOString()}' AND is_published = 1 AND is_overshadowed = 0`,
           )
           .addSelect(C('start'), { addToGroupBy: 'end' })
           .addSelect(C('end'), { addToGroupBy: 'end' })
@@ -218,28 +218,20 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
     },
   });
 
-  if (segmentRowsState.loading) {
+  if (segmentBarsState.loading) {
     return <Loader />;
   }
 
-  if (segmentRowsState.error) {
+  if (segmentBarsState.error) {
     return (
       <div className="empty-placeholder">
-        <span className="no-data-text">{`Error when loading data: ${segmentRowsState.getErrorMessage()}`}</span>
+        <span className="no-data-text">{`Error when loading data: ${segmentBarsState.getErrorMessage()}`}</span>
       </div>
     );
   }
 
-  const segmentRows = segmentRowsState.data;
-  if (!segmentRows) return null;
-
-  if (!segmentRows.length) {
-    return (
-      <div className="empty-placeholder">
-        <span className="no-data-text">There are no segments for the selected interval</span>
-      </div>
-    );
-  }
+  const segmentBars = segmentBarsState.data;
+  if (!segmentBars) return null;
 
   return (
     <SegmentBarChartRender
@@ -247,7 +239,7 @@ export const SegmentBarChart = function SegmentBarChart(props: SegmentBarChartPr
       dateRange={dateRange}
       changeDateRange={changeDateRange}
       shownSegmentStat={shownSegmentStat}
-      segmentBars={segmentRows as any}
+      segmentBars={segmentBars}
       changeActiveDatasource={changeActiveDatasource}
     />
   );
