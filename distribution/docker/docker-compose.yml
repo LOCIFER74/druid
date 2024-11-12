@@ -132,3 +132,20 @@ services:
       - router
     env_file:
       - environment
+
+
+  overlord:
+    image: apache/druid:31.0.0
+    container_name: overlord
+    volumes:
+      - druid_shared:/opt/shared
+    depends_on:
+      - zookeeper
+      - postgres
+      - coordinator
+    ports:
+      - "8090:8090"
+    command:
+      - overlord
+    env_file:
+      - environment
